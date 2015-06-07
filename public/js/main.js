@@ -66,11 +66,13 @@
 		interval = setInterval(function(){
 
 			videoContext.drawImage(video, 0, 0, 320, 240);
-        	image = canvas.toDataURL('image/jpeg', 0.1);
+        	image = canvas.toDataURL('image/jpeg', 0.5);
+
+        	// Incase get pixel
         	//image = videoContext.getImageData(0,0,320,240);
 
         	var encode = HuffmanEncode(image);
-			socket.emit('stream', encode);
+			socket.emit('write', encode);
 
 		},60);
 	}

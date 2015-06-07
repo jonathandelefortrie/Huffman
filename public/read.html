@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <title>Huffman Read</title>
+  </head>
+  <body>
+  	<div id="container"></div>
+  	<script src="/socket.io/socket.io.js"></script>
+    <script src="/js/binary.js"></script>
+    <script src="/js/huffman.js"></script>
+  	<script type="text/javascript">
+    	!function(window){
+
+  			'use strict';
+
+        var container = document.getElementById("container");
+        var img = document.createElement('img');
+        container.appendChild(img);
+
+  			var socket = io.connect('http://localhost');
+
+  			socket.on('read',function(data){
+
+  				var decode = HuffmanDecode(data);
+  				img.src = decode;
+
+  			});
+
+  		}(window);
+  	</script>
+  </body>
+</html>

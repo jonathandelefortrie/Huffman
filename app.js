@@ -2,89 +2,90 @@ var debug = require('debug')('kleep-huffman');
 var express = require('express');
 var path = require('path');
 var fs = require('fs');
+var es = require('event-stream');
 var app = express();
 var server = require('http').createServer(app);
 var io = require('socket.io').listen(server);
 
+// Middleware
+app.use(function(req, res, next) {
+  req.io = io;
+  next();
+});
+app.set('watchingFile', true);
 app.set('port', process.env.PORT || 3000);
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/stream', function(req, res) {
+app.get('/read/:id', function(req, res) {
 
-	var readableStream = fs.createReadStream('public/stream.txt');
-
-    //app.set('watchingFile', true)
-	 
-	//readableStream.setEncoding('utf8');
+	var id = req.params.id;
+	var file = 'stream/stream'+id+'.txt';
+	var stream = fs.createReadStream(file, {flags: 'r'})
 	
-	// readableStream.on('data', function(data) {
-	// 	console.log(data);
-	// });
+	req.io.sockets.on('connection', function(socket) {
 
-	// readableStream.pipe(res);
+		stream.pipe(es.split()).pipe(es.map(function (line, cb) {
+
+		    if(line) {
+		    	var data = JSON.parse(line);
+		    	socket.emit('read', data);
+		    }
+		    cb(null, line);
+		}));
+
+	});
+
+	res.sendFile(__dirname + '/public/read.html');
 	
-	// readableStream.on('end', function(data) {
-	//     console.log(data);
-	// });
+});
+
+app.get('/write/:id', function(req, res) {
+
+	var id = req.params.id;
+	var file = 'stream/stream'+id+'.txt';
+	var stream = fs.createWriteStream(file, {flags:'a'});
+
+	// Clean file
+	fs.truncate(file, 0);
+
+	req.io.sockets.on('connection', function(socket) {
+
+		socket.on('write', function (data) {
+			stream.write(JSON.stringify(data) + '\n');
+		});
+
+	});
+
+	res.sendFile(__dirname + '/public/write.html');
 
 });
 
-var clients = new Array();
-var writeFile = fs.createWriteStream('stream.txt');
+/// Streams
+
+var streams = new Array();
 
 io.sockets.on('connection', function (socket) {
 
-	clients.push(socket);
+	socket.on('add', function () {
 
-	socket.on('connect', function (config) {
-
-	    console.log('Connected',socket.id);
+		streams.push(socket);
+	    console.log('Stream added:', socket.id);
 	});
 
-	socket.on('disconnect', function () {
+	socket.on('remove', function () {
 
-		var index = clients.indexOf(socket);
-		delete clients[index];
-       	clients.splice(index,1);
+		var index = streams.indexOf(socket);
 
-        console.log('Disconnected',socket.id);
+		if(index !== -1) {
+			delete streams[index];
+       		streams.splice(index,1);
+       		console.log('Stream removed',socket.id);
+		}
 	});
 
-	socket.on('stream', function (data) {
-
-		var huffman = HuffmanDecode(data);
-		var base64 = huffman.substr(huffman.indexOf(',') + 1);
-		var buffer = new Buffer(base64, 'base64');
-
-		fs.writeFile('public/stream.txt', buffer.toString('binary'), 'binary');
-
-		// fs.writeFile('public/stream.txt', data);
-		
-		// writeFile.write(buffer.toString('binary'));
-	});
-
-	
 });
 
-function HuffmanDecode(encode) {
-
-    var pos = 0;
-    var decoded = "";
-    var decoding = {};
-
-    for (var ch in encode.encoding) 
-        decoding[encode.encoding[ch]] = ch;
-
-    while (pos < encode.encoded.length) {
-        var key = "";
-        while (!(key in decoding)) {
-            key += encode.encoded[pos];
-            pos++;
-        }
-        decoded += decoding[key];
-    }
-    return decoded;
-}
+///
 
 server.listen(app.get('port'), function() {
   debug('Express server listening on port ' + server.address().port);
