@@ -51,7 +51,18 @@ app.get('/write/:id', function(req, res) {
 	req.io.sockets.on('connection', function(socket) {
 
 		socket.on('write', function (data) {
+
+			var line = '';
+			var read = fs.readFileSync(file,{ encoding: 'utf-8' });
+			var lines = (read) ? read.split('\n') : null;
+
+			if(lines && lines.length >= 10) {
+				line = lines.shift();
+				fs.writeFile(file, read.substring(line.length,read.length));
+			}
+
 			stream.write(JSON.stringify(data) + '\n');
+			
 		});
 
 	});
